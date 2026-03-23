@@ -6,9 +6,8 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 
-import { Product } from './entities/product.entity';
 import {validate as isUUID}  from "uuid";
-import { title } from 'process';
+import { ProductImage, Product} from './entities';
 
 @Injectable()
 export class ProductService {
@@ -16,15 +15,26 @@ export class ProductService {
 
   constructor(
     @InjectRepository(Product)
-    private readonly productRepository: Repository<Product>
+    private readonly productRepository: Repository<Product>,
+
+    @InjectRepository(ProductImage)
+    private readonly productImageRepository: Repository<ProductImage>
   ) {}
 
   async create(createProductDto: CreateProductDto) {
     try {
-      const product = this.productRepository.create(createProductDto);
+      
+      const { images = [], ...productDetails } = createProductDto;
+
+      const product = this.productRepository.create(
+        {
+          ...productDetails,
+          images: images.map(image => this.productImageRepository.create({url:image}))
+
+        });
       await this.productRepository.save(product);
 
-      return product;
+      return {...product, images};
 
     } catch (error) {
       this.handleDBExceptions(error);
@@ -33,11 +43,17 @@ export class ProductService {
 
   async findAll(paginationDto:PaginationDto) {
     const {limit = 10, offset = 0} = paginationDto
-    return await this.productRepository.find({
+    const products =  await this.productRepository.find({
       take:limit,
-      skip:offset
-      // TODO: relaciones
-    });
+      skip:offset,
+      relations: {
+        images:true
+      }
+ })
+      return products.map(product => ({
+        ...product,
+        images: product.images.map( img => img.url)
+}))
   }
 
   async findOne(term: string) {
@@ -67,7 +83,8 @@ export class ProductService {
   async update(id: string, updateProductDto: UpdateProductDto) {
     const product = await this.productRepository.preload({
       id:id,
-      ...updateProductDto
+      ...updateProductDto,
+      images: []
     });
 
     if (!product){
@@ -81,10 +98,7 @@ export class ProductService {
     } catch(error){
       this.handleDBExceptions(error);
     }
-
-
-
-  }
+ }
 
  async remove(id: string) {
     const product = await this.findOne(id);
