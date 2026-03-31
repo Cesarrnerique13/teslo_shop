@@ -28,5 +28,9 @@
 ```
 docker compose up -d
 ```
+6. Ejecutar SEED 
+```
+http//:localhost300/api/seed
+```
 
 6. levantar ```npm run start:dev```
